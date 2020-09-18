@@ -1,5 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const mongoose = require("mongoose");
+
 const HttpError = require("./models/http-error");
 const placesRoutes = require("./routes/places-route");
 const usersRoutes = require("./routes/users-route");
@@ -27,6 +29,18 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(5000, () => {
-    console.log("Server listening on port 5000");
+
+mongoose.connect("mongodb://Stotteh-PC:27017,Stotteh-PC:27018,Stotteh-PC:27019?replicaSet=rs?retryWrites=false", {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    useFindAndModify: false,
 })
+.then(() => {
+    app.listen(5000, () => {
+        console.log("Server listening on port 5000");
+    });
+})
+.catch((err) => {
+    console.log(err);
+});
+

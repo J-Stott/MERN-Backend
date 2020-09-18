@@ -1,35 +1,24 @@
 const HttpError = require("../models/http-error");
 const {validationResult} = require("express-validator");
 
-const DUMMY_USERS = [
-    {
-        id: "u1",
-        name: "User01",
-        email: "test@test.com",
-        password: "Test1234",
-        places: 4
-    },
-    {
-        id: "u2",
-        name: "User02",
-        email: "test2@test.com",
-        password: "Test1235",
-        places: 2
-    },
-];
+const Users = require("../models/user");
 
-const getAllUsers = (req, res, next) => {
+const getAllUsers = async (req, res, next) => {
     console.log("GET request in /users");
 
-    if(DUMMY_USERS.length === 0){
-        const error = new HttpError("Could not find any users", 404);
+    try {
+        const users = await Users.find({}, "-password").exec();
+        res.status(200).json({users: users.map((user) => user.toObject({getters: true}))});
+
+    } catch(err) {
+        const error = new HttpError("Something went wrong", 500);
         return next(error);
     }
 
-    res.status(200).json({users: DUMMY_USERS});
+
 }
 
-const signup = (req, res, next) => {
+const signup = async (req, res, next) => {
     console.log("POST request in /signup");
 
     const errors = validationResult(req);
@@ -39,45 +28,56 @@ const signup = (req, res, next) => {
         return next(error);
     }
 
-    const {username, email, password} = req.body;
+    const {name, email, password, image} = req.body;
+    let existingUser = null;
 
-    const userExists = DUMMY_USERS.find((user) => {
-        return user.email === email;
-    });
+    try{
+        existingUser = await Users.findOne({email: email}).exec();
 
-    if(userExists){
-        const error = new HttpError("This user already exists", 422);
+        if(existingUser) {
+            const error = new HttpError("User already exists. Login instead", 422);
+            return next(error);
+        }
+
+        const newUser = new Users({
+            name: name,
+            email: email,
+            password: password,
+            image: image,
+            places: []
+        });
+
+        await newUser.save();
+
+        return res.status(201).json({newUser: newUser.toObject({getters: true})});
+
+    } catch(err) {
+        console.log(err);
+        const error = new HttpError("Something went wrong", 500);
         return next(error);
     }
 
-    const newUser = {
-        id: `u${DUMMY_USERS.length + 1}`,
-        name: username,
-        email: email,
-        password: password,
-        places: 0
-    }
 
-    DUMMY_USERS.push(newUser);
-
-    return res.status(201).json({newUser});
 }
 
-const login = (req, res, next) => {
+const login = async (req, res, next) => {
     console.log("POST request in /:login");
 
     const {email, password} = req.body;
 
-    const user = DUMMY_USERS.find((user) => {
-        return user.email === email;
-    });
+    try {
+        const user = await Users.findOne({email: email}).exec();
 
-    if(!user || user.password !== password){
-        const error = new HttpError("Could not verify user credentials.", 404);
+        if(!user || user.password !== password){
+            const error = new HttpError("Could not verify user credentials.", 404);
+            return next(error);
+        }
+
+        return res.json({user});
+    } catch(err) {
+        const error = new HttpError("Something went wrong", 500);
         return next(error);
     }
-
-    return res.json({user});
 }
 
 
